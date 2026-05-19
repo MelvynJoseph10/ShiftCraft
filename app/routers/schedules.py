@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, require_manager, send_shift_assigned_email, send_shift_cancelled_email
 from app.database import get_db
 from app.models import Facility, Shift, ShiftStatus, User
-from app.schemas import ShiftCreate, ShiftOut
+from app.schemas import CopyWeekRequest, CopyWeekResult, ShiftCreate, ShiftOut
 
 router = APIRouter(tags=["schedules"])
 
@@ -58,6 +58,67 @@ def create_shift(payload: ShiftCreate, db: Session = Depends(get_db), _: User = 
         shift.end_time,
     )
     return shift
+
+
+@router.post("/schedules/copy-week", response_model=CopyWeekResult)
+def copy_week(payload: CopyWeekRequest, db: Session = Depends(get_db), _: User = Depends(require_manager)):
+    from_start, from_end = _week_bounds(payload.from_week)
+    to_start, _ = _week_bounds(payload.to_week)
+    delta = to_start - from_start
+
+    source_shifts = db.query(Shift).filter(
+        Shift.status == ShiftStatus.scheduled,
+        Shift.start_time >= from_start,
+        Shift.start_time < from_end,
+    ).all()
+
+    copied = skipped = 0
+    for s in source_shifts:
+        new_start = s.start_time + delta
+        new_end = s.end_time + delta
+        conflict = db.query(Shift).filter(
+            Shift.user_id == s.user_id,
+            Shift.status == ShiftStatus.scheduled,
+            Shift.start_time < new_end,
+            Shift.end_time > new_start,
+        ).first()
+        if conflict:
+            skipped += 1
+            continue
+        new_shift = Shift(
+            facility_id=s.facility_id,
+            user_id=s.user_id,
+            start_time=new_start,
+            end_time=new_end,
+        )
+        db.add(new_shift)
+        db.flush()
+        copied += 1
+
+    db.commit()
+
+    if copied:
+        new_shifts = db.query(Shift).filter(
+            Shift.status == ShiftStatus.scheduled,
+            Shift.start_time >= to_start,
+            Shift.start_time < to_start + timedelta(weeks=1),
+        ).all()
+        emp_cache, fac_cache = {}, {}
+        for ns in new_shifts:
+            if ns.user_id not in emp_cache:
+                emp_cache[ns.user_id] = db.query(User).filter(User.id == ns.user_id).first()
+            if ns.facility_id not in fac_cache:
+                fac_cache[ns.facility_id] = db.query(Facility).filter(Facility.id == ns.facility_id).first()
+            emp = emp_cache[ns.user_id]
+            fac = fac_cache[ns.facility_id]
+            if emp:
+                send_shift_assigned_email(
+                    emp.email, emp.name,
+                    fac.name if fac else f"Facility #{ns.facility_id}",
+                    ns.start_time, ns.end_time,
+                )
+
+    return CopyWeekResult(copied=copied, skipped=skipped)
 
 
 @router.get("/schedules", response_model=list[ShiftOut])

@@ -117,6 +117,16 @@ class TimeOffCreate(BaseModel):
     reason: str
 
 
+class CopyWeekRequest(BaseModel):
+    from_week: str
+    to_week: str
+
+
+class CopyWeekResult(BaseModel):
+    copied: int
+    skipped: int
+
+
 class DashboardStats(BaseModel):
     upcoming_shifts: int
     this_week_shifts: int

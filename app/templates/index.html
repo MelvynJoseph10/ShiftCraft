@@ -432,6 +432,7 @@
         <div style="display:flex;gap:0.5rem;align-items:center">
           <input type="week" id="schedule-week" onchange="loadSchedule()" />
           <button class="btn btn-secondary" onclick="loadSchedule()">Refresh</button>
+          <button class="btn btn-secondary" id="copy-week-btn" style="display:none" onclick="openCopyWeekModal()">Copy Week</button>
         </div>
       </div>
       <table>
@@ -670,6 +671,22 @@
 </div>
 
 <!-- Logout confirm modal -->
+<!-- Copy week modal -->
+<div id="copy-week-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:360px">
+    <h3 style="margin:0 0 0.75rem">Copy Week</h3>
+    <p style="font-size:0.85rem;color:#718096;margin:0 0 1.25rem">Copies all scheduled shifts from one week to another. Conflicts are skipped.</p>
+    <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:0.25rem">From week</label>
+    <input type="week" id="copy-from-week" style="width:100%;margin-bottom:1rem" />
+    <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:0.25rem">To week</label>
+    <input type="week" id="copy-to-week" style="width:100%;margin-bottom:1.25rem" />
+    <div style="display:flex;gap:0.75rem">
+      <button class="btn" id="copy-week-submit" onclick="executeCopyWeek()" style="flex:1">Copy</button>
+      <button type="button" onclick="document.getElementById('copy-week-modal').style.display='none'" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="logout-modal" class="modal-overlay">
   <div class="modal-box">
     <h3 style="margin:0 0 0.4rem">Sign out?</h3>
@@ -995,6 +1012,7 @@ async function afterLogin() {
   );
   if (currentRole === 'manager') {
     ['facilities','employees','schedules','timeoff','reports'].forEach(n => document.getElementById('nav-' + n).style.display = '');
+    document.getElementById('copy-week-btn').style.display = '';
     updateTimeOffBadge();
   } else {
     ['schedules','availability','timeoff'].forEach(n => document.getElementById('nav-' + n).style.display = '');
@@ -1400,6 +1418,31 @@ async function createShift(e) {
     document.getElementById('shift-start').value = ''; document.getElementById('shift-end').value = '';
     loadSchedule();
   } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
+}
+function openCopyWeekModal() {
+  const wk = document.getElementById('schedule-week').value;
+  if (wk) document.getElementById('copy-from-week').value = wk;
+  document.getElementById('copy-to-week').value = '';
+  document.getElementById('copy-week-modal').style.display = 'flex';
+}
+async function executeCopyWeek() {
+  const from = document.getElementById('copy-from-week').value;
+  const to = document.getElementById('copy-to-week').value;
+  if (!from || !to) { showMsg('Please select both weeks.', 'error'); return; }
+  if (from === to) { showMsg('Source and target week must be different.', 'error'); return; }
+  const btn = document.getElementById('copy-week-submit'); setLoading(btn, true);
+  try {
+    const [fy, fw] = from.split('-W'), [ty, tw] = to.split('-W');
+    const result = await apiFetch('/schedules/copy-week', {
+      method: 'POST',
+      body: JSON.stringify({ from_week: fy + '-W' + fw, to_week: ty + '-W' + tw }),
+    });
+    document.getElementById('copy-week-modal').style.display = 'none';
+    const skippedMsg = result.skipped ? `, ${result.skipped} skipped (conflicts)` : '';
+    showMsg(`Copied ${result.copied} shift${result.copied !== 1 ? 's' : ''}${skippedMsg}.`, 'success');
+    document.getElementById('schedule-week').value = to;
+    loadSchedule();
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
 }
 async function cancelShift(id) {
   if (!confirm('Cancel this shift?')) return;
