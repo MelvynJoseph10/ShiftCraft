@@ -528,6 +528,7 @@
       <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem">
         <input type="week" id="report-week" style="max-width:200px" />
         <button class="btn" onclick="loadReports()">Load</button>
+        <button class="btn btn-secondary" onclick="exportReportsCSV()">Export CSV</button>
       </div>
       <table>
         <thead><tr><th>Employee</th><th>Scheduled Hrs</th><th>Completed Hrs</th><th>Total Shifts</th></tr></thead>
@@ -1452,6 +1453,25 @@ async function cancelShift(id) {
 async function completeShift(id) {
   try { await apiFetch('/schedules/' + id + '/complete', { method:'PUT' }); showMsg('Shift marked as completed.','success'); loadSchedule(); }
   catch(err) { showMsg(err.message,'error'); }
+}
+
+function exportReportsCSV() {
+  const wk = document.getElementById('report-week').value;
+  let url = '/reports/hours/export';
+  if (wk) { const [y, w] = wk.split('-W'); url += '?week=' + y + '-W' + w; }
+  const a = document.createElement('a');
+  a.href = url;
+  a.setAttribute('Authorization', 'Bearer ' + token());
+  fetch(url, { headers: { Authorization: 'Bearer ' + token() } })
+    .then(r => r.blob())
+    .then(blob => {
+      const wkLabel = wk || 'current-week';
+      a.href = URL.createObjectURL(blob);
+      a.download = 'shiftcraft-hours-' + wkLabel + '.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(() => showMsg('Export failed.', 'error'));
 }
 
 // ── Availability ──────────────────────────────────────────────────────────────
