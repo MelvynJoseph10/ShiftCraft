@@ -11,7 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.database import Base, engine
 from app.limiter import limiter
-from app.routers import auth, availability, dashboard, employees, facilities, reports, schedules, time_off
+from app.routers import auth, availability, dashboard, employees, facilities, reports, schedules, swaps, time_off
 
 load_dotenv()
 
@@ -48,6 +48,7 @@ app.include_router(availability.router)
 app.include_router(time_off.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
+app.include_router(swaps.router)
 
 
 @app.get("/health")

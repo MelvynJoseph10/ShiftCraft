@@ -105,6 +105,13 @@
     .btn-danger:hover:not(:disabled) { background: #c53030; }
     .btn-success { background: #38a169; }
     .btn-success:hover:not(:disabled) { background: #276749; }
+    .swap-shift-option { padding: 0.6rem 0.75rem; cursor: pointer; border-radius: 4px; border-bottom: 1px solid #2d3748; font-size: 0.85rem; }
+    .swap-shift-option:last-child { border-bottom: none; }
+    .swap-shift-option:hover { background: #2d3748; }
+    .swap-shift-option.selected { background: #e94560; color: #fff; }
+    .swap-shift-option.selected .swap-sub { color: rgba(255,255,255,0.75); }
+    .swap-sub { font-size: 0.78rem; color: #a0aec0; margin-top: 0.15rem; }
+    .swap-section-title { font-size: 0.82rem; font-weight: 700; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0 0.5rem; }
     .logout-btn {
       background: none; border: 1px solid rgba(233,69,96,0.6); color: #e94560;
       padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;
@@ -426,6 +433,24 @@
         <button type="submit">Assign Shift</button>
       </form>
     </div>
+    <div class="card" id="swap-requests-card" style="display:none">
+      <h2>Swap Requests</h2>
+      <div id="swap-approval-wrap" style="display:none">
+        <p class="swap-section-title">Pending Approval</p>
+        <table><thead><tr><th>From</th><th>Their Shift</th><th>Swapping With</th><th>Target Shift</th><th></th></tr></thead>
+        <tbody id="swap-approval-list"></tbody></table>
+      </div>
+      <div id="swap-incoming-wrap" style="display:none">
+        <p class="swap-section-title">Requests For You</p>
+        <table><thead><tr><th>From</th><th>Their Shift</th><th>Your Shift</th><th>Status</th><th></th></tr></thead>
+        <tbody id="swap-incoming-list"></tbody></table>
+      </div>
+      <div id="swap-outgoing-wrap" style="display:none">
+        <p class="swap-section-title">Your Requests</p>
+        <table><thead><tr><th>Your Shift</th><th>Swap With</th><th>Their Shift</th><th>Status</th></tr></thead>
+        <tbody id="swap-outgoing-list"></tbody></table>
+      </div>
+    </div>
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
         <h2 style="margin:0">Schedule</h2>
@@ -672,6 +697,20 @@
 </div>
 
 <!-- Logout confirm modal -->
+<!-- Swap request modal -->
+<div id="swap-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px">
+    <h3 style="margin:0 0 0.25rem">Request Shift Swap</h3>
+    <p style="font-size:0.82rem;color:#718096;margin:0 0 1rem">Your shift: <strong id="swap-my-shift-label"></strong></p>
+    <p style="font-size:0.82rem;font-weight:600;margin:0 0 0.4rem">Select a shift to swap with:</p>
+    <div id="swap-target-list" style="max-height:280px;overflow-y:auto;border:1px solid #2d3748;border-radius:6px"></div>
+    <div style="display:flex;gap:0.75rem;margin-top:1rem">
+      <button id="swap-submit-btn" class="btn" onclick="submitSwapRequest()" disabled style="flex:1">Request Swap</button>
+      <button type="button" onclick="closeSwapModal()" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Copy week modal -->
 <div id="copy-week-modal" class="modal-overlay">
   <div class="modal-box" style="max-width:360px">
@@ -727,7 +766,7 @@ function showPanel(name) {
   if (name === 'schedules')  {
     const wp = document.getElementById('schedule-week');
     if (!wp.value) wp.value = currentISOWeek();
-    loadScheduleDropdowns(); loadSchedule();
+    loadScheduleDropdowns(); loadSchedule(); loadSwapRequests();
   }
   if (name === 'availability') loadAvailability();
   if (name === 'timeoff')    loadTimeOff();
@@ -1403,7 +1442,10 @@ async function loadSchedule() {
           <td>${fmtDateTime(s.start_time)}</td>
           <td>${fmtDateTime(s.end_time)}</td>
           <td>${sBadge(s.status)}</td>
-          <td>${currentRole === 'manager' && s.status === 'scheduled' ? (new Date(s.end_time) <= new Date() ? `<button class="btn btn-success" onclick="completeShift(${s.id})">Complete</button> <button class="btn btn-danger" onclick="cancelShift(${s.id})">Cancel</button>` : `<button class="btn btn-danger" onclick="cancelShift(${s.id})">Cancel</button>`) : ''}</td>
+          <td style="display:flex;gap:0.3rem;flex-wrap:wrap">
+            ${currentRole === 'manager' && s.status === 'scheduled' ? (new Date(s.end_time) <= new Date() ? `<button class="btn btn-success" onclick="completeShift(${s.id})">Complete</button><button class="btn btn-danger" onclick="cancelShift(${s.id})">Cancel</button>` : `<button class="btn btn-danger" onclick="cancelShift(${s.id})">Cancel</button>`) : ''}
+            ${currentRole !== 'manager' && s.status === 'scheduled' && new Date(s.start_time) > new Date() ? `<button class="btn btn-secondary" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="openSwapModal(${s.id})">Swap</button>` : ''}
+          </td>
         </tr>`).join('')
       : emptyRow(6, 'No shifts found for this period.', '📆');
   } catch(err) { showMsg(err.message,'error'); tb.innerHTML = emptyRow(6,'Failed to load.','⚠️'); }
@@ -1420,6 +1462,113 @@ async function createShift(e) {
     loadSchedule();
   } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
 }
+// ── Shift Swaps ───────────────────────────────────────────────────────────────
+let _swapMyShiftId = null, _swapTargetShiftId = null;
+function _fmtSwapShift(start, end, facility) {
+  return `${escapeHtml(facility)} · ${fmtDateTime(start)} – ${fmtTime(end)}`;
+}
+async function openSwapModal(myShiftId) {
+  _swapMyShiftId = myShiftId;
+  _swapTargetShiftId = null;
+  document.getElementById('swap-submit-btn').disabled = true;
+  const list = document.getElementById('swap-target-list');
+  list.innerHTML = '<div style="padding:1rem;color:#a0aec0;text-align:center">Loading…</div>';
+  document.getElementById('swap-modal').style.display = 'flex';
+  try {
+    const shifts = await apiFetch('/swaps/available-shifts');
+    if (!shifts.length) { list.innerHTML = '<div style="padding:1rem;color:#a0aec0;text-align:center">No available shifts to swap with.</div>'; return; }
+    list.innerHTML = shifts.map(s => `
+      <div class="swap-shift-option" data-id="${s.id}" onclick="selectSwapTarget(${s.id}, this)">
+        <strong>${escapeHtml(s.employee_name)}</strong> — ${escapeHtml(s.facility_name)}
+        <div class="swap-sub">${fmtDateTime(s.start_time)} – ${fmtTime(s.end_time)}</div>
+      </div>`).join('');
+    const myShift = shifts.find ? null : null;
+    document.getElementById('swap-my-shift-label').textContent = 'Shift #' + myShiftId;
+  } catch(err) { list.innerHTML = '<div style="padding:1rem;color:#e53e3e">Failed to load shifts.</div>'; }
+}
+function selectSwapTarget(shiftId, el) {
+  document.querySelectorAll('.swap-shift-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  _swapTargetShiftId = shiftId;
+  document.getElementById('swap-submit-btn').disabled = false;
+}
+function closeSwapModal() {
+  document.getElementById('swap-modal').style.display = 'none';
+  _swapMyShiftId = null; _swapTargetShiftId = null;
+}
+async function submitSwapRequest() {
+  if (!_swapMyShiftId || !_swapTargetShiftId) return;
+  const btn = document.getElementById('swap-submit-btn'); setLoading(btn, true);
+  try {
+    await apiFetch('/swaps', { method:'POST', body: JSON.stringify({ requester_shift_id: _swapMyShiftId, target_shift_id: _swapTargetShiftId }) });
+    closeSwapModal();
+    showMsg('Swap request sent!', 'success');
+    loadSwapRequests();
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+async function loadSwapRequests() {
+  const card = document.getElementById('swap-requests-card');
+  try {
+    if (currentRole === 'manager') {
+      const reqs = await apiFetch('/swaps');
+      const wrap = document.getElementById('swap-approval-wrap');
+      document.getElementById('swap-incoming-wrap').style.display = 'none';
+      document.getElementById('swap-outgoing-wrap').style.display = 'none';
+      if (!reqs.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      wrap.style.display = '';
+      document.getElementById('swap-approval-list').innerHTML = reqs.map(r => `<tr>
+        <td>${escapeHtml(r.requester_name)}</td>
+        <td style="font-size:0.82rem">${_fmtSwapShift(r.requester_shift_start, r.requester_shift_end, r.requester_facility)}</td>
+        <td>${escapeHtml(r.target_name)}</td>
+        <td style="font-size:0.82rem">${_fmtSwapShift(r.target_shift_start, r.target_shift_end, r.target_facility)}</td>
+        <td style="display:flex;gap:0.3rem">
+          <button class="btn btn-success" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="reviewSwap(${r.id},'approve')">Approve</button>
+          <button class="btn btn-danger" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="reviewSwap(${r.id},'deny')">Deny</button>
+        </td></tr>`).join('');
+    } else {
+      const reqs = await apiFetch('/swaps/me');
+      document.getElementById('swap-approval-wrap').style.display = 'none';
+      if (!reqs.length) { card.style.display = 'none'; return; }
+      card.style.display = '';
+      const incoming = reqs.filter(r => r.target_user_id === currentUserId && r.status === 'pending');
+      const outgoing = reqs.filter(r => r.requester_id === currentUserId);
+      const inWrap = document.getElementById('swap-incoming-wrap');
+      const outWrap = document.getElementById('swap-outgoing-wrap');
+      inWrap.style.display = incoming.length ? '' : 'none';
+      outWrap.style.display = outgoing.length ? '' : 'none';
+      if (incoming.length) document.getElementById('swap-incoming-list').innerHTML = incoming.map(r => `<tr>
+        <td>${escapeHtml(r.requester_name)}</td>
+        <td style="font-size:0.82rem">${_fmtSwapShift(r.requester_shift_start, r.requester_shift_end, r.requester_facility)}</td>
+        <td style="font-size:0.82rem">${_fmtSwapShift(r.target_shift_start, r.target_shift_end, r.target_facility)}</td>
+        <td><span class="badge badge-gray">Pending your response</span></td>
+        <td style="display:flex;gap:0.3rem">
+          <button class="btn btn-success" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="respondToSwap(${r.id},'accept')">Accept</button>
+          <button class="btn btn-danger" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="respondToSwap(${r.id},'reject')">Reject</button>
+        </td></tr>`).join('');
+      if (outgoing.length) document.getElementById('swap-outgoing-list').innerHTML = outgoing.map(r => `<tr>
+        <td style="font-size:0.82rem">${_fmtSwapShift(r.requester_shift_start, r.requester_shift_end, r.requester_facility)}</td>
+        <td>${escapeHtml(r.target_name)}</td>
+        <td style="font-size:0.82rem">${_fmtSwapShift(r.target_shift_start, r.target_shift_end, r.target_facility)}</td>
+        <td><span class="badge badge-gray">${escapeHtml(r.status)}</span></td></tr>`).join('');
+    }
+  } catch(err) { card.style.display = 'none'; }
+}
+async function respondToSwap(id, action) {
+  try {
+    await apiFetch('/swaps/' + id + '/' + action, { method:'PUT' });
+    showMsg('Swap request ' + action + 'ed.', 'success');
+    loadSwapRequests();
+  } catch(err) { showMsg(err.message, 'error'); }
+}
+async function reviewSwap(id, action) {
+  try {
+    await apiFetch('/swaps/' + id + '/' + action, { method:'PUT' });
+    showMsg('Swap ' + action + 'd.', 'success');
+    loadSwapRequests(); loadSchedule();
+  } catch(err) { showMsg(err.message, 'error'); }
+}
+
 function openCopyWeekModal() {
   const wk = document.getElementById('schedule-week').value;
   if (wk) document.getElementById('copy-from-week').value = wk;

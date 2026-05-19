@@ -40,6 +40,14 @@ class TimeOffStatus(str, enum.Enum):
     denied = "denied"
 
 
+class SwapStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+    approved = "approved"
+    denied = "denied"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -108,3 +116,18 @@ class TimeOffRequest(Base):
 
     user = relationship("User", back_populates="time_off_requests", foreign_keys=[user_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class ShiftSwapRequest(Base):
+    __tablename__ = "shift_swap_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    requester_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=False)
+    target_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=False)
+    status = Column(Enum(SwapStatus), default=SwapStatus.pending, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    requester = relationship("User", foreign_keys=[requester_id])
+    requester_shift = relationship("Shift", foreign_keys=[requester_shift_id])
+    target_shift = relationship("Shift", foreign_keys=[target_shift_id])

@@ -161,6 +161,56 @@ def send_shift_cancelled_email(to_email: str, employee_name: str, facility_name:
     _send_email(to_email, "ShiftCraft — Shift Cancelled", text, html)
 
 
+def send_swap_requested_email(to_email: str, target_name: str, requester_name: str, req_info: str, tgt_info: str) -> None:
+    if not SMTP_HOST:
+        print(f"[DEV] Swap request email for {to_email}: {requester_name} wants to swap")
+        return
+    text = f"Hi {target_name},\n\n{requester_name} has requested to swap shifts with you.\nTheir shift: {req_info}\nYour shift: {tgt_info}\n\nLog in to ShiftCraft to accept or reject."
+    html = f"""<div style="font-family:sans-serif;max-width:480px">
+  <h2 style="color:#1a1a2e">Shift Swap Request</h2>
+  <p>Hi {target_name},</p>
+  <p><strong>{requester_name}</strong> wants to swap shifts with you.</p>
+  <table style="width:100%;border-collapse:collapse;margin:1rem 0">
+    <tr><td style="padding:0.4rem;color:#718096">Their shift:</td><td style="padding:0.4rem">{req_info}</td></tr>
+    <tr><td style="padding:0.4rem;color:#718096">Your shift:</td><td style="padding:0.4rem">{tgt_info}</td></tr>
+  </table>
+  <p><a href="{APP_URL}" style="display:inline-block;background:#e94560;color:#fff;padding:0.6rem 1.25rem;border-radius:6px;text-decoration:none;font-weight:600">Respond in ShiftCraft</a></p>
+</div>"""
+    _send_email(to_email, "ShiftCraft — Shift Swap Request", text, html)
+
+
+def send_swap_response_email(to_email: str, requester_name: str, accepted: bool, target_name: str) -> None:
+    if not SMTP_HOST:
+        print(f"[DEV] Swap response email for {to_email}: {'accepted' if accepted else 'rejected'} by {target_name}")
+        return
+    word = "accepted" if accepted else "rejected"
+    text = f"Hi {requester_name},\n\n{target_name} has {word} your shift swap request."
+    html = f"""<div style="font-family:sans-serif;max-width:480px">
+  <h2 style="color:#1a1a2e">Swap Request {word.capitalize()}</h2>
+  <p>Hi {requester_name},</p>
+  <p><strong>{target_name}</strong> has <span style="color:{'#38a169' if accepted else '#e53e3e'};font-weight:600">{word}</span> your shift swap request.</p>
+  {'<p>Your request is now pending manager approval.</p>' if accepted else ''}
+  <p><a href="{APP_URL}" style="display:inline-block;background:#e94560;color:#fff;padding:0.6rem 1.25rem;border-radius:6px;text-decoration:none;font-weight:600">View ShiftCraft</a></p>
+</div>"""
+    _send_email(to_email, f"ShiftCraft — Swap Request {word.capitalize()}", text, html)
+
+
+def send_swap_decision_email(to_email: str, name: str, approved: bool, req_info: str, tgt_info: str) -> None:
+    if not SMTP_HOST:
+        print(f"[DEV] Swap decision email for {to_email}: {'approved' if approved else 'denied'}")
+        return
+    word = "approved" if approved else "denied"
+    color = "#38a169" if approved else "#e53e3e"
+    text = f"Hi {name},\n\nYour shift swap has been {word} by a manager.\nShifts involved:\n{req_info}\n{tgt_info}"
+    html = f"""<div style="font-family:sans-serif;max-width:480px">
+  <h2 style="color:#1a1a2e">Shift Swap {word.capitalize()}</h2>
+  <p>Hi {name},</p>
+  <p>Your shift swap has been <span style="color:{color};font-weight:600">{word}</span> by a manager.</p>
+  <p><a href="{APP_URL}" style="display:inline-block;background:#e94560;color:#fff;padding:0.6rem 1.25rem;border-radius:6px;text-decoration:none;font-weight:600">View Schedule</a></p>
+</div>"""
+    _send_email(to_email, f"ShiftCraft — Shift Swap {word.capitalize()}", text, html)
+
+
 def send_time_off_decision_email(to_email: str, employee_name: str, decision: str, start_date, end_date) -> None:
     if not SMTP_HOST:
         print(f"[DEV] Time-off {decision} email for {to_email}: {start_date} to {end_date}")

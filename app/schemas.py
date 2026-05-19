@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
-from app.models import EmployeeRole, ShiftStatus, TimeOffStatus, UserRole
+from app.models import EmployeeRole, ShiftStatus, SwapStatus, TimeOffStatus, UserRole
 
 
 class UserCreate(BaseModel):
@@ -115,6 +115,40 @@ class TimeOffCreate(BaseModel):
     start_date: date
     end_date: date
     reason: str
+
+
+class ShiftWithNamesOut(BaseModel):
+    id: int
+    facility_id: int
+    user_id: int
+    start_time: datetime
+    end_time: datetime
+    status: ShiftStatus
+    employee_name: str
+    facility_name: str
+
+
+class SwapRequestCreate(BaseModel):
+    requester_shift_id: int
+    target_shift_id: int
+
+
+class SwapRequestOut(BaseModel):
+    id: int
+    requester_id: int
+    requester_name: str
+    requester_shift_id: int
+    requester_shift_start: datetime
+    requester_shift_end: datetime
+    requester_facility: str
+    target_shift_id: int
+    target_user_id: int
+    target_name: str
+    target_shift_start: datetime
+    target_shift_end: datetime
+    target_facility: str
+    status: SwapStatus
+    created_at: datetime
 
 
 class CopyWeekRequest(BaseModel):
