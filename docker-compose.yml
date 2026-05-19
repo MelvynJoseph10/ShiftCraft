@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shiftcraft
+      POSTGRES_USER: shiftcraft
+      POSTGRES_PASSWORD: shiftcraft
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shiftcraft"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://shiftcraft:shiftcraft@db:5432/shiftcraft
+      SECRET_KEY: ${SECRET_KEY:-change-me-to-a-random-32-char-string}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+
+volumes:
+  pgdata:

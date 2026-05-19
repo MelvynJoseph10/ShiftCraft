@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShiftCraft</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    header h1 { font-size: 1.4rem; letter-spacing: 1px; cursor: pointer; transition: color 0.15s; }
+    header h1:hover { color: #e94560; }
+    .header-right { display: flex; align-items: center; gap: 0.875rem; }
+    .user-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.78rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .user-meta { line-height: 1.2; }
+    .user-meta .uname { font-size: 0.82rem; font-weight: 600; color: #fff; }
+    .user-meta .urole { font-size: 0.7rem; color: #a0aec0; text-transform: capitalize; }
+
+    /* ── Nav ── */
+    nav { background: #16213e; display: flex; overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    nav button {
+      background: none; border: none; color: #a0aec0;
+      padding: 0.75rem 1.25rem; cursor: pointer; font-size: 0.875rem;
+      transition: background 0.15s, color 0.15s; white-space: nowrap;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    nav button:hover, nav button.active { background: #0f3460; color: #e94560; }
+    .nav-badge {
+      background: #e94560; color: #fff; font-size: 0.65rem; font-weight: 700;
+      padding: 0.1rem 0.4rem; border-radius: 999px; min-width: 1.1rem; text-align: center;
+    }
+
+    /* ── Layout ── */
+    main { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* ── Panels ── */
+    .panel { display: none; }
+    .panel.active { display: block; animation: fadeIn 0.18s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Cards ── */
+    .card { background: #fff; border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .card h2 { margin-bottom: 1rem; font-size: 1.05rem; font-weight: 700; color: #16213e; }
+
+    /* ── Dashboard ── */
+    .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .dash-stat { text-align: center; margin-bottom: 0; transition: transform 0.15s, box-shadow 0.15s; cursor: default; }
+    .dash-stat:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+    .dash-stat .stat-num { font-size: 2.25rem; font-weight: 700; color: #e94560; line-height: 1; }
+    .dash-stat .stat-label { font-size: 0.78rem; color: #718096; margin-top: 0.4rem; }
+    .shift-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #edf2f7; }
+    .shift-item:last-child { border-bottom: none; }
+    .shift-date-box { background: #f7fafc; border-radius: 8px; padding: 0.35rem 0.65rem; text-align: center; min-width: 50px; flex-shrink: 0; }
+    .shift-date-box .sday { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: #718096; }
+    .shift-date-box .snum { font-size: 1.25rem; font-weight: 700; color: #16213e; line-height: 1.1; }
+    .shift-info { flex: 1; min-width: 0; }
+    .shift-info .sname { font-weight: 600; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shift-info .stime { font-size: 0.775rem; color: #718096; margin-top: 0.1rem; }
+
+    /* ── Forms ── */
+    form { display: flex; flex-direction: column; gap: 0.75rem; }
+    label { font-size: 0.82rem; font-weight: 600; color: #4a5568; }
+    input, select, textarea {
+      padding: 0.5rem 0.75rem; border: 1.5px solid #e2e8f0; border-radius: 6px;
+      font-size: 0.9rem; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; background: #fff;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #e94560; box-shadow: 0 0 0 3px rgba(233,69,96,0.1); }
+    textarea { resize: vertical; font-family: inherit; }
+    .form-row { display: flex; gap: 1rem; }
+    .form-row > * { flex: 1; min-width: 0; }
+
+    /* ── Buttons ── */
+    button[type="submit"], .btn {
+      background: #e94560; color: #fff; border: none;
+      padding: 0.6rem 1.25rem; border-radius: 6px; cursor: pointer;
+      font-size: 0.875rem; font-weight: 600; align-self: flex-start;
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    }
+    button[type="submit"]:hover:not(:disabled), .btn:hover:not(:disabled) { background: #c73652; }
+    button[type="submit"]:active:not(:disabled), .btn:active:not(:disabled) { transform: scale(0.97); }
+    button[type="submit"]:disabled, .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary { background: #718096; }
+    .btn-secondary:hover:not(:disabled) { background: #4a5568; }
+    .btn-danger { background: #e53e3e; }
+    .btn-danger:hover:not(:disabled) { background: #c53030; }
+    .btn-success { background: #38a169; }
+    .btn-success:hover:not(:disabled) { background: #276749; }
+    .logout-btn {
+      background: none; border: 1px solid rgba(233,69,96,0.6); color: #e94560;
+      padding: 0.3rem 0.75rem; border-radius: 6px; cursor: pointer;
+      font-size: 0.78rem; font-weight: 600; transition: background 0.15s, color 0.15s;
+    }
+    .logout-btn:hover { background: #e94560; color: #fff; }
+
+    /* ── Toast ── */
+    #message {
+      position: fixed; top: 1rem; right: 1rem;
+      padding: 0.75rem 1.25rem; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600; display: none;
+      z-index: 200; max-width: 360px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn { from { transform: translateX(16px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    #message.success { background: #c6f6d5; color: #22543d; border-left: 4px solid #38a169; }
+    #message.error   { background: #fed7d7; color: #742a2a; border-left: 4px solid #e53e3e; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; padding: 0.6rem 0.75rem; background: #f7fafc; color: #4a5568; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+    td { padding: 0.65rem 0.75rem; border-top: 1px solid #edf2f7; vertical-align: middle; }
+    tr:hover td { background: #fafbfc; }
+
+    /* ── Badges ── */
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+    .badge-green  { background: #c6f6d5; color: #22543d; }
+    .badge-yellow { background: #fefcbf; color: #744210; }
+    .badge-red    { background: #fed7d7; color: #742a2a; }
+    .badge-gray   { background: #e2e8f0; color: #4a5568; }
+
+    /* ── Skeleton loader ── */
+    @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+    .skeleton {
+      display: inline-block; height: 0.82rem; border-radius: 4px;
+      background: linear-gradient(90deg, #edf2f7 25%, #e2e8f0 50%, #edf2f7 75%);
+      background-size: 400px 100%; animation: shimmer 1.4s infinite;
+    }
+
+    /* ── Empty state ── */
+    .empty-state { text-align: center; padding: 2rem 1rem; color: #a0aec0; }
+    .empty-state .empty-icon { font-size: 1.75rem; margin-bottom: 0.4rem; }
+    .empty-state p { font-size: 0.85rem; }
+
+    /* ── Search ── */
+    .search-wrap { position: relative; margin-bottom: 1rem; }
+    .search-wrap input { padding-left: 2.2rem; }
+    .search-icon { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: #a0aec0; font-size: 0.85rem; pointer-events: none; }
+
+    /* ── Password ── */
+    .pw-strength-bar { height: 4px; border-radius: 2px; margin-top: 4px; background: #e2e8f0; overflow: hidden; }
+    .pw-strength-bar div { height: 100%; border-radius: 2px; width: 0; transition: width 0.3s, background 0.3s; }
+    .pw-strength-label { font-size: 0.72rem; margin-top: 2px; min-height: 1.1em; }
+
+    /* ── Login panel ── */
+    #login-panel { max-width: 420px; margin: 3rem auto; }
+
+    /* ── Modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999; align-items: center; justify-content: center; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 2rem; width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); animation: fadeIn 0.15s ease; }
+
+    /* ── Profile modal ── */
+    .profile-header { display: flex; gap: 0.875rem; align-items: center; margin-bottom: 1.25rem; }
+    .profile-section { margin-top: 1.25rem; }
+    .profile-section h4 { font-size: 0.72rem; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.5rem; padding-bottom: 0.35rem; border-bottom: 1px solid #edf2f7; }
+    .clickable-name { color: #667eea; cursor: pointer; font-weight: 600; text-decoration: none; }
+    .clickable-name:hover { text-decoration: underline; }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      header { padding: 0.75rem 1rem; }
+      .user-meta { display: none; }
+      main { margin: 1rem auto; padding: 0 0.75rem; }
+      .form-row { flex-direction: column; }
+      .dash-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+      th, td { padding: 0.5rem 0.5rem; font-size: 0.8rem; }
+      #login-panel { margin: 1.5rem auto; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="message"></div>
+
+<header>
+  <h1 onclick="goHome()" title="Go to Dashboard">ShiftCraft</h1>
+  <div class="header-right">
+    <div id="user-avatar" class="user-avatar" style="display:none"></div>
+    <div id="user-meta" class="user-meta" style="display:none">
+      <div id="user-name" class="uname"></div>
+      <div id="user-role-tag" class="urole"></div>
+    </div>
+    <button id="settings-btn" style="display:none;background:none;border:none;color:#a0aec0;cursor:pointer;font-size:1.1rem;padding:0.25rem 0.4rem;border-radius:4px;transition:color 0.15s" onclick="document.getElementById('change-pw-modal').style.display='flex'" title="Change Password">⚙</button>
+    <button class="logout-btn" id="logout-btn" style="display:none" onclick="logout()">Sign Out</button>
+  </div>
+</header>
+
+<nav id="main-nav" style="display:none">
+  <button onclick="showPanel('login')" id="nav-login" style="display:none">Login</button>
+  <button onclick="showPanel('home')" id="nav-home" style="display:none">Home</button>
+  <button onclick="showPanel('facilities')" id="nav-facilities" style="display:none">Facilities</button>
+  <button onclick="showPanel('employees')" id="nav-employees" style="display:none">Employees</button>
+  <button onclick="showPanel('schedules')" id="nav-schedules" style="display:none">Schedule</button>
+  <button onclick="showPanel('availability')" id="nav-availability" style="display:none">Availability</button>
+  <button onclick="showPanel('timeoff')" id="nav-timeoff" style="display:none">Time Off <span class="nav-badge" id="timeoff-badge" style="display:none"></span></button>
+  <button onclick="showPanel('reports')" id="nav-reports" style="display:none">Reports</button>
+</nav>
+
+<main>
+
+  <!-- RESET PASSWORD -->
+  <div id="reset-panel" class="panel">
+    <div class="card" style="max-width:420px;margin:3rem auto">
+      <h2 style="margin-bottom:1.5rem">Set New Password</h2>
+      <form id="reset-form" onsubmit="doResetConfirm(event)">
+        <input type="hidden" id="reset-token-input" />
+        <label for="reset-new-pw">New Password</label>
+        <div style="position:relative;display:flex;align-items:center">
+          <input type="password" id="reset-new-pw" required autocomplete="new-password" minlength="8" maxlength="128" oninput="checkStrength(this.value,'reset-pw-bar','reset-pw-label')" style="padding-right:2.5rem;width:100%" />
+          <button type="button" onclick="togglePw('reset-new-pw',this)" aria-label="Show password" aria-pressed="false" style="position:absolute;right:0.5rem;background:none;border:none;cursor:pointer;color:#718096;padding:0.25rem;font-size:1rem">👁</button>
+        </div>
+        <div class="pw-strength-bar"><div id="reset-pw-bar"></div></div>
+        <span class="pw-strength-label" id="reset-pw-label"></span>
+        <label for="reset-confirm-pw">Confirm Password</label>
+        <input type="password" id="reset-confirm-pw" required autocomplete="new-password" maxlength="128" />
+        <button type="submit">Set Password</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="login-panel" class="panel active">
+    <div class="card">
+      <h2 style="margin-bottom:1.5rem">Sign in to ShiftCraft</h2>
+      <form id="login-form" onsubmit="doLogin(event)">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" required placeholder="you@example.com" autocomplete="email" />
+        <label for="login-password">Password</label>
+        <div style="position:relative;display:flex;align-items:center">
+          <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password" maxlength="128" style="padding-right:2.5rem;width:100%" />
+          <button type="button" onclick="togglePw('login-password',this)" aria-label="Show password" aria-pressed="false" style="position:absolute;right:0.5rem;background:none;border:none;cursor:pointer;color:#718096;padding:0.25rem;font-size:1rem">👁</button>
+        </div>
+        <button type="submit">Sign In</button>
+        <p style="text-align:right;margin-top:0.5rem">
+          <a href="#" onclick="document.getElementById('forgot-modal').style.display='flex';return false" style="font-size:0.82rem;color:#667eea">Forgot password?</a>
+        </p>
+      </form>
+      <p style="margin-top:1.25rem;font-size:0.82rem;color:#a0aec0;text-align:center">
+        Don't have an account? Contact your manager.
+      </p>
+    </div>
+  </div>
+
+
+  <!-- HOME / DASHBOARD -->
+  <div id="home-panel" class="panel">
+    <div class="card">
+      <h2 id="home-greeting" style="font-size:1.5rem;font-weight:700">Hi there!</h2>
+      <p id="home-role-label" style="color:#718096;margin-top:0.4rem;font-size:0.875rem"></p>
+    </div>
+    <div class="dash-grid">
+      <div class="card dash-stat">
+        <div class="stat-num" id="dash-shifts">—</div>
+        <div class="stat-label">Upcoming Shifts</div>
+      </div>
+      <div class="card dash-stat">
+        <div class="stat-num" id="dash-week-shifts">—</div>
+        <div class="stat-label">This Week Shifts</div>
+      </div>
+      <div class="card dash-stat">
+        <div class="stat-num" id="dash-week-hours">—</div>
+        <div class="stat-label">This Week Hours</div>
+      </div>
+      <div class="card dash-stat">
+        <div class="stat-num" id="dash-timeoff">—</div>
+        <div class="stat-label">Pending Time Off</div>
+      </div>
+      <div class="card dash-stat" id="dash-employees-card" style="display:none">
+        <div class="stat-num" id="dash-employees">—</div>
+        <div class="stat-label">Active Employees</div>
+      </div>
+    </div>
+    <div class="card" id="dash-upcoming-card" style="display:none">
+      <h2>Upcoming Shifts</h2>
+      <div id="dash-upcoming-list"></div>
+    </div>
+  </div>
+
+  <!-- FACILITIES -->
+  <div id="facilities-panel" class="panel">
+    <div class="card" id="manager-add-facility">
+      <h2>Add Facility</h2>
+      <form onsubmit="createFacility(event)">
+        <label>Name</label>
+        <input type="text" id="fac-name" required placeholder="Main Warehouse" />
+        <div class="form-row">
+          <div>
+            <label>Opening Time</label>
+            <input type="time" id="fac-open" required />
+          </div>
+          <div>
+            <label>Closing Time</label>
+            <input type="time" id="fac-close" required />
+          </div>
+        </div>
+        <button type="submit">Create Facility</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Facilities</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Opens</th><th>Closes</th><th></th></tr></thead>
+        <tbody id="facilities-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EMPLOYEES -->
+  <div id="employees-panel" class="panel">
+    <div class="card" id="manager-add-employee">
+      <h2>Add User</h2>
+      <form onsubmit="createEmployee(event)">
+        <div class="form-row">
+          <div>
+            <label for="emp-name">Full Name</label>
+            <input type="text" id="emp-name" required placeholder="John Doe" autocomplete="off" />
+          </div>
+          <div>
+            <label for="emp-email">Email</label>
+            <input type="email" id="emp-email" required autocomplete="off" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label for="emp-password">Temporary Password</label>
+            <div style="position:relative;display:flex;align-items:center">
+              <input type="password" id="emp-password" required autocomplete="new-password" minlength="8" maxlength="128" oninput="checkStrength(this.value,'emp-pw-bar','emp-pw-label')" style="padding-right:2.5rem;width:100%" />
+              <button type="button" onclick="togglePw('emp-password',this)" aria-label="Show password" aria-pressed="false" style="position:absolute;right:0.5rem;background:none;border:none;cursor:pointer;color:#718096;padding:0.25rem;font-size:1rem">👁</button>
+            </div>
+            <div class="pw-strength-bar"><div id="emp-pw-bar"></div></div>
+            <span class="pw-strength-label" id="emp-pw-label"></span>
+          </div>
+          <div>
+            <label for="emp-role">Role</label>
+            <select id="emp-role" onchange="toggleEmpFields()">
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+        </div>
+        <div id="emp-level-wrap">
+          <label for="emp-level">Employee Level</label>
+          <select id="emp-level">
+            <option value="">— none —</option>
+            <option value="junior">Junior</option>
+            <option value="experienced">Experienced</option>
+            <option value="senior">Senior</option>
+          </select>
+        </div>
+        <button type="submit">Add User</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Managers</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Since</th><th></th></tr></thead>
+        <tbody id="managers-list"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Employees</h2>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="emp-search" placeholder="Search by name or email…" oninput="filterEmployees(this.value)" />
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Level</th><th>Since</th><th></th></tr></thead>
+        <tbody id="employees-list"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="deactivated-card" style="display:none">
+      <h2 style="color:#718096">Deactivated Users</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+        <tbody id="deactivated-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SCHEDULES -->
+  <div id="schedules-panel" class="panel">
+    <div class="card" id="manager-add-shift">
+      <h2>Assign Shift</h2>
+      <form onsubmit="createShift(event)">
+        <div class="form-row">
+          <div>
+            <label>Facility</label>
+            <select id="shift-facility" required></select>
+          </div>
+          <div>
+            <label>Employee</label>
+            <select id="shift-employee" required></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>Start</label>
+            <input type="datetime-local" id="shift-start" required />
+          </div>
+          <div>
+            <label>End</label>
+            <input type="datetime-local" id="shift-end" required />
+          </div>
+        </div>
+        <button type="submit">Assign Shift</button>
+      </form>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <h2 style="margin:0">Schedule</h2>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <input type="week" id="schedule-week" onchange="loadSchedule()" />
+          <button class="btn btn-secondary" onclick="loadSchedule()">Refresh</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Employee</th><th>Facility</th><th>Start</th><th>End</th><th>Status</th><th></th></tr></thead>
+        <tbody id="schedules-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AVAILABILITY -->
+  <div id="availability-panel" class="panel">
+    <div class="card">
+      <h2>Set My Availability</h2>
+      <form onsubmit="addAvailability(event)">
+        <div class="form-row">
+          <div>
+            <label>Day of Week</label>
+            <select id="avail-day">
+              <option value="0">Monday</option>
+              <option value="1">Tuesday</option>
+              <option value="2">Wednesday</option>
+              <option value="3">Thursday</option>
+              <option value="4">Friday</option>
+              <option value="5">Saturday</option>
+              <option value="6">Sunday</option>
+            </select>
+          </div>
+          <div>
+            <label>Start Time</label>
+            <input type="time" id="avail-start" required />
+          </div>
+          <div>
+            <label>End Time</label>
+            <input type="time" id="avail-end" required />
+          </div>
+        </div>
+        <button type="submit">Add Availability</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>My Availability</h2>
+      <table>
+        <thead><tr><th>Day</th><th>Start</th><th>End</th><th></th></tr></thead>
+        <tbody id="availability-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TIME OFF -->
+  <div id="timeoff-panel" class="panel">
+    <div class="card">
+      <h2>Request Time Off</h2>
+      <form onsubmit="submitTimeOff(event)">
+        <div class="form-row">
+          <div>
+            <label>Start Date</label>
+            <input type="date" id="to-start" required />
+          </div>
+          <div>
+            <label>End Date</label>
+            <input type="date" id="to-end" required />
+          </div>
+        </div>
+        <label for="to-reason">Reason</label>
+        <textarea id="to-reason" rows="3" required placeholder="Describe your reason…" maxlength="300" oninput="updateCounter(this,'to-reason-count',300)"></textarea>
+        <div style="text-align:right;margin-top:-0.25rem"><span id="to-reason-count" style="font-size:0.72rem;color:#a0aec0">0 / 300</span></div>
+        <button type="submit">Submit Request</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>My Requests</h2>
+      <table>
+        <thead><tr><th>Start</th><th>End</th><th>Reason</th><th>Status</th></tr></thead>
+        <tbody id="my-timeoff-list"></tbody>
+      </table>
+      <div id="timeoff-load-more" style="display:none;text-align:center;margin-top:0.75rem">
+        <button class="btn btn-secondary" onclick="loadMoreTimeOff()">Load more</button>
+      </div>
+    </div>
+    <div class="card" id="manager-timeoff-card" style="display:none">
+      <h2>Pending Requests (Manager)</h2>
+      <table>
+        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Reason</th><th>Status</th><th></th></tr></thead>
+        <tbody id="all-timeoff-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="reports-panel" class="panel">
+    <div class="card">
+      <h2>Hours Report</h2>
+      <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem">
+        <input type="week" id="report-week" style="max-width:200px" />
+        <button class="btn" onclick="loadReports()">Load</button>
+      </div>
+      <table>
+        <thead><tr><th>Employee</th><th>Scheduled Hrs</th><th>Completed Hrs</th><th>Total Shifts</th></tr></thead>
+        <tbody id="reports-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- Forgot password modal -->
+<div id="forgot-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="margin:0 0 0.5rem">Reset Password</h3>
+    <p style="font-size:0.85rem;color:#718096;margin:0 0 1.25rem">Enter your email and we'll send a reset link if an account exists.</p>
+    <form onsubmit="doResetPassword(event)">
+      <label for="fp-email">Email</label>
+      <input type="email" id="fp-email" required placeholder="you@example.com" autocomplete="email" />
+      <div style="display:flex;gap:0.75rem;margin-top:0.25rem">
+        <button type="submit" style="flex:1;align-self:auto">Send Reset Link</button>
+        <button type="button" onclick="document.getElementById('forgot-modal').style.display='none'" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Change password modal -->
+<div id="change-pw-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="margin:0 0 1.25rem">Change Password</h3>
+    <form onsubmit="doChangePassword(event)">
+      <label for="cp-current">Current Password</label>
+      <div style="position:relative;display:flex;align-items:center">
+        <input type="password" id="cp-current" required autocomplete="current-password" maxlength="128" style="padding-right:2.5rem;width:100%" />
+        <button type="button" onclick="togglePw('cp-current',this)" aria-label="Show password" aria-pressed="false" style="position:absolute;right:0.5rem;background:none;border:none;cursor:pointer;color:#718096;padding:0.25rem;font-size:1rem">👁</button>
+      </div>
+      <label for="cp-new">New Password</label>
+      <div style="position:relative;display:flex;align-items:center">
+        <input type="password" id="cp-new" required autocomplete="new-password" minlength="8" maxlength="128" oninput="checkStrength(this.value,'cp-pw-bar','cp-pw-label')" style="padding-right:2.5rem;width:100%" />
+        <button type="button" onclick="togglePw('cp-new',this)" aria-label="Show password" aria-pressed="false" style="position:absolute;right:0.5rem;background:none;border:none;cursor:pointer;color:#718096;padding:0.25rem;font-size:1rem">👁</button>
+      </div>
+      <div class="pw-strength-bar"><div id="cp-pw-bar"></div></div>
+      <span class="pw-strength-label" id="cp-pw-label"></span>
+      <label for="cp-confirm">Confirm New Password</label>
+      <input type="password" id="cp-confirm" required autocomplete="new-password" maxlength="128" />
+      <div style="display:flex;gap:0.75rem;margin-top:0.5rem">
+        <button type="submit" style="flex:1;align-self:auto">Update Password</button>
+        <button type="button" onclick="closeCpModal()" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit facility modal -->
+<div id="edit-fac-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="margin:0 0 1.25rem">Edit Facility</h3>
+    <form onsubmit="doEditFacility(event)">
+      <input type="hidden" id="edit-fac-id" />
+      <label for="edit-fac-name">Name</label>
+      <input type="text" id="edit-fac-name" required autocomplete="off" />
+      <div class="form-row">
+        <div>
+          <label for="edit-fac-open">Opening Time</label>
+          <input type="time" id="edit-fac-open" required />
+        </div>
+        <div>
+          <label for="edit-fac-close">Closing Time</label>
+          <input type="time" id="edit-fac-close" required />
+        </div>
+      </div>
+      <div style="display:flex;gap:0.75rem;margin-top:0.75rem">
+        <button type="submit" style="flex:1;align-self:auto">Save Changes</button>
+        <button type="button" onclick="closeEditFacilityModal()" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Employee profile modal -->
+<div id="profile-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:680px;width:100%;max-height:85vh;overflow-y:auto">
+    <div class="profile-header">
+      <div id="profile-avatar" class="user-avatar" style="width:44px;height:44px;font-size:0.9rem;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div id="profile-name" style="font-size:1.05rem;font-weight:700;color:#16213e"></div>
+        <div id="profile-email" style="font-size:0.82rem;color:#718096"></div>
+        <div id="profile-meta" style="font-size:0.78rem;color:#a0aec0;margin-top:0.15rem"></div>
+      </div>
+      <button onclick="closeProfileModal()" style="background:none;border:none;cursor:pointer;color:#a0aec0;font-size:1.1rem;padding:0.25rem;flex-shrink:0" aria-label="Close">✕</button>
+    </div>
+    <div class="profile-section">
+      <h4>Upcoming Shifts</h4>
+      <table style="font-size:0.82rem">
+        <thead><tr><th>Date</th><th>Facility</th><th>Time</th><th>Status</th></tr></thead>
+        <tbody id="profile-shifts"></tbody>
+      </table>
+    </div>
+    <div class="profile-section">
+      <h4>Availability</h4>
+      <table style="font-size:0.82rem">
+        <thead><tr><th>Day</th><th>Start</th><th>End</th></tr></thead>
+        <tbody id="profile-availability"></tbody>
+      </table>
+    </div>
+    <div class="profile-section">
+      <h4>Time Off Requests</h4>
+      <table style="font-size:0.82rem">
+        <thead><tr><th>Start</th><th>End</th><th>Reason</th><th>Status</th></tr></thead>
+        <tbody id="profile-timeoff"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Edit employee modal -->
+<div id="edit-emp-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="margin:0 0 1.25rem">Edit User</h3>
+    <form onsubmit="doEditEmployee(event)">
+      <input type="hidden" id="edit-emp-id" />
+      <label for="edit-emp-name">Full Name</label>
+      <input type="text" id="edit-emp-name" required autocomplete="off" />
+      <label for="edit-emp-email">Email</label>
+      <input type="email" id="edit-emp-email" required autocomplete="off" />
+      <div id="edit-emp-level-wrap">
+        <label for="edit-emp-level">Employee Level</label>
+        <select id="edit-emp-level">
+          <option value="">— none —</option>
+          <option value="junior">Junior</option>
+          <option value="experienced">Experienced</option>
+          <option value="senior">Senior</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:0.75rem;margin-top:0.75rem">
+        <button type="submit" style="flex:1;align-self:auto">Save Changes</button>
+        <button type="button" onclick="closeEditModal()" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Logout confirm modal -->
+<div id="logout-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 style="margin:0 0 0.4rem">Sign out?</h3>
+    <p style="font-size:0.875rem;color:#718096;margin-bottom:1.5rem">You'll need to sign in again to access your account.</p>
+    <div style="display:flex;gap:0.75rem">
+      <button class="btn btn-danger" onclick="confirmLogout()" style="flex:1;align-self:auto">Sign Out</button>
+      <button type="button" onclick="document.getElementById('logout-modal').style.display='none'" style="flex:1;background:#e2e8f0;color:#4a5568;border:none;padding:0.6rem;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+let currentRole = null, currentUserId = null, currentUserName = null;
+let employeeMap = {}, employeeEmailMap = {}, facilityMap = {}, userRegistry = {}, facilityRegistry = {};
+let activeEmployees = [];
+
+// ── Core ──────────────────────────────────────────────────────────────────────
+function token() { return localStorage.getItem('jwt'); }
+function authHeaders() { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() }; }
+
+function showMsg(msg, type) {
+  const el = document.getElementById('message');
+  el.textContent = msg; el.className = type; el.style.display = 'block';
+  clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 4500);
+}
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(name + '-panel').classList.add('active');
+  const nb = document.getElementById('nav-' + name);
+  if (nb) nb.classList.add('active');
+  if (name === 'home')       loadDashboard();
+  if (name === 'facilities') loadFacilities();
+  if (name === 'employees')  loadEmployees();
+  if (name === 'schedules')  {
+    const wp = document.getElementById('schedule-week');
+    if (!wp.value) wp.value = currentISOWeek();
+    loadScheduleDropdowns(); loadSchedule();
+  }
+  if (name === 'availability') loadAvailability();
+  if (name === 'timeoff')    loadTimeOff();
+  if (name === 'reports')    loadReports();
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function timeGreeting() {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+function currentISOWeek() {
+  const d = new Date();
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() + 4 - day); // shift to Thursday (anchor of ISO week)
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return d.getFullYear() + '-W' + String(weekNo).padStart(2, '0');
+}
+function fmtDate(str) {
+  if (!str) return '—';
+  return new Date(str + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function fmtDateTime(str) {
+  if (!str) return '—';
+  return new Date(str).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function fmtTime(str) {
+  if (!str) return '—';
+  return new Date(str).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function loadingRow(cols) {
+  const ws = ['55%','75%','45%','65%','50%','70%'];
+  return Array(3).fill(0).map(() =>
+    `<tr>${Array(cols).fill(0).map((_,i) => `<td><span class="skeleton" style="width:${ws[i%ws.length]}"></span></td>`).join('')}</tr>`
+  ).join('');
+}
+function emptyRow(cols, msg, icon = '📭') {
+  return `<tr><td colspan="${cols}"><div class="empty-state"><div class="empty-icon">${icon}</div><p>${msg}</p></div></td></tr>`;
+}
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function empLabel(id) {
+  const name = employeeMap[id], email = employeeEmailMap[id];
+  if (!name) return String(id);
+  return email
+    ? `${escapeHtml(name)}<br><small style="color:#a0aec0;font-size:0.75rem">${escapeHtml(email)}</small>`
+    : escapeHtml(name);
+}
+async function ensureEmployeeMap() {
+  if (Object.keys(employeeMap).length > 0) return;
+  try {
+    const emps = await apiFetch('/employees');
+    emps.forEach(u => { employeeMap[u.id] = u.name; employeeEmailMap[u.id] = u.email; });
+  } catch {}
+}
+async function ensureFacilityMap() {
+  if (Object.keys(facilityMap).length > 0) return;
+  try {
+    const facs = await apiFetch('/facilities');
+    facs.forEach(f => { facilityMap[f.id] = f.name; facilityRegistry[f.id] = f; });
+  } catch {}
+}
+function setLoading(btn, on) {
+  if (on) { btn.dataset.orig = btn.innerHTML; btn.innerHTML = 'Saving…'; btn.disabled = true; }
+  else { btn.innerHTML = btn.dataset.orig || btn.innerHTML; btn.disabled = false; delete btn.dataset.orig; }
+}
+function updateCounter(el, id, max) { document.getElementById(id).textContent = el.value.length + ' / ' + max; }
+function filterEmployees(q) {
+  document.querySelectorAll('#employees-list tr').forEach(row => {
+    if (row.querySelector('td[colspan]')) return;
+    row.style.display = row.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+function forceLogout() {
+  const wasLoggedIn = currentRole !== null;
+  localStorage.removeItem('jwt');
+  currentRole = currentUserId = currentUserName = null;
+  employeeMap = {}; employeeEmailMap = {}; facilityMap = {}; userRegistry = {}; facilityRegistry = {};
+  document.getElementById('user-avatar').style.display = 'none';
+  document.getElementById('user-meta').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('settings-btn').style.display = 'none';
+  ['home','facilities','employees','schedules','availability','timeoff'].forEach(n =>
+    document.getElementById('nav-' + n).style.display = 'none'
+  );
+  document.getElementById('main-nav').style.display = 'none';
+  showPanel('login');
+  return wasLoggedIn;
+}
+
+async function apiFetch(path, options = {}) {
+  const resp = await fetch(path, { headers: authHeaders(), ...options });
+  if (resp.status === 401) {
+    const wasLoggedIn = forceLogout();
+    if (wasLoggedIn) showMsg('Your session has expired. Please sign in again.', 'error');
+    throw new Error('Session expired');
+  }
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+    throw new Error(err.detail || JSON.stringify(err));
+  }
+  return resp.json();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function goHome() { if (token()) showPanel('home'); }
+
+function logout() { document.getElementById('logout-modal').style.display = 'flex'; }
+
+function confirmLogout() {
+  document.getElementById('logout-modal').style.display = 'none';
+  forceLogout();
+}
+
+function toggleEmpLevel() {
+  document.getElementById('reg-emp-level-wrap').style.display =
+    document.getElementById('reg-role').value === 'employee' ? '' : 'none';
+}
+function toggleEmpFields() {
+  const isEmployee = document.getElementById('emp-role').value === 'employee';
+  document.getElementById('emp-level-wrap').style.display = isEmployee ? '' : 'none';
+}
+function togglePw(id, btn) {
+  const inp = document.getElementById(id), show = inp.type === 'text';
+  inp.type = show ? 'password' : 'text';
+  btn.style.opacity = show ? '1' : '0.4';
+  btn.setAttribute('aria-pressed', String(!show));
+  btn.setAttribute('aria-label', show ? 'Show password' : 'Hide password');
+}
+function checkStrength(val, barId, labelId) {
+  const bar = document.getElementById(barId), lbl = document.getElementById(labelId);
+  if (!val) { bar.style.width = '0'; lbl.textContent = ''; return; }
+  let s = 0;
+  if (val.length >= 8) s++; if (val.length >= 12) s++;
+  if (/[A-Z]/.test(val)) s++; if (/[0-9]/.test(val)) s++; if (/[^A-Za-z0-9]/.test(val)) s++;
+  const lvls = [
+    { t:'Too short', c:'#fc8181', p:'15%' }, { t:'Weak', c:'#fc8181', p:'25%' },
+    { t:'Fair', c:'#f6ad55', p:'50%' },      { t:'Good', c:'#68d391', p:'75%' },
+    { t:'Strong', c:'#48bb78', p:'100%' }
+  ];
+  const l = lvls[Math.min(s,4)];
+  bar.style.width = l.p; bar.style.background = l.c;
+  lbl.textContent = l.t; lbl.style.color = l.c;
+}
+
+function closeCpModal() {
+  document.getElementById('change-pw-modal').style.display = 'none';
+  document.getElementById('cp-current').value = '';
+  document.getElementById('cp-new').value = '';
+  document.getElementById('cp-confirm').value = '';
+  checkStrength('', 'cp-pw-bar', 'cp-pw-label');
+}
+
+async function doChangePassword(e) {
+  e.preventDefault();
+  const newPw = document.getElementById('cp-new').value;
+  const confirm = document.getElementById('cp-confirm').value;
+  if (newPw !== confirm) { showMsg('New passwords do not match.', 'error'); return; }
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/auth/password', { method: 'PUT', body: JSON.stringify({
+      current_password: document.getElementById('cp-current').value,
+      new_password: newPw
+    })});
+    closeCpModal();
+    showMsg('Password updated successfully.', 'success');
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+
+async function doResetConfirm(e) {
+  e.preventDefault();
+  const newPw = document.getElementById('reset-new-pw').value;
+  const confirm = document.getElementById('reset-confirm-pw').value;
+  if (newPw !== confirm) { showMsg('Passwords do not match.', 'error'); return; }
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    const res = await fetch('/auth/reset-password/confirm', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: document.getElementById('reset-token-input').value, new_password: newPw })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+    e.target.reset(); checkStrength('', 'reset-pw-bar', 'reset-pw-label');
+    showMsg('Password reset. Please sign in.', 'success');
+    showPanel('login');
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+
+function openEditModal(id) {
+  const u = userRegistry[id];
+  if (!u) return;
+  document.getElementById('edit-emp-id').value = id;
+  document.getElementById('edit-emp-name').value = u.name;
+  document.getElementById('edit-emp-email').value = u.email;
+  const levelWrap = document.getElementById('edit-emp-level-wrap');
+  const levelSelect = document.getElementById('edit-emp-level');
+  if (u.role === 'employee') {
+    levelWrap.style.display = '';
+    levelSelect.value = u.employee_role || '';
+  } else {
+    levelWrap.style.display = 'none';
+    levelSelect.value = '';
+  }
+  document.getElementById('edit-emp-modal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('edit-emp-modal').style.display = 'none';
+}
+async function doEditEmployee(e) {
+  e.preventDefault();
+  const id = parseInt(document.getElementById('edit-emp-id').value);
+  const levelWrap = document.getElementById('edit-emp-level-wrap');
+  const body = {
+    name: document.getElementById('edit-emp-name').value,
+    email: document.getElementById('edit-emp-email').value,
+  };
+  if (levelWrap.style.display !== 'none') {
+    body.employee_role = document.getElementById('edit-emp-level').value || null;
+  }
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/employees/' + id, { method: 'PUT', body: JSON.stringify(body) });
+    closeEditModal();
+    showMsg('User updated.', 'success');
+    loadEmployees();
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+
+async function reactivateEmployee(id) {
+  try {
+    await apiFetch('/employees/' + id + '/reactivate', { method: 'PUT' });
+    showMsg('User reactivated.', 'success');
+    loadEmployees();
+  } catch(err) { showMsg(err.message, 'error'); }
+}
+
+async function doResetPassword(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/auth/reset-password', { method:'POST', body: JSON.stringify({ email: document.getElementById('fp-email').value }) });
+    document.getElementById('forgot-modal').style.display = 'none';
+    document.getElementById('fp-email').value = '';
+    showMsg("If that email exists, a reset link is on its way.", 'success');
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    const res = await fetch('/auth/login', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: document.getElementById('login-email').value, password: document.getElementById('login-password').value }) });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail); }
+    const { access_token } = await res.json();
+    localStorage.setItem('jwt', access_token);
+    await afterLogin();
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+
+
+async function afterLogin() {
+  const me = await apiFetch('/auth/me');
+  currentRole = me.role; currentUserId = me.id; currentUserName = me.name;
+  const initials = me.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+  const av = document.getElementById('user-avatar');
+  av.textContent = initials; av.style.background = me.role === 'manager' ? '#e94560' : '#667eea'; av.style.display = 'flex';
+  document.getElementById('user-name').textContent = me.name;
+  document.getElementById('user-role-tag').textContent = me.role.charAt(0).toUpperCase() + me.role.slice(1);
+  document.getElementById('user-meta').style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  document.getElementById('settings-btn').style.display = '';
+  document.getElementById('main-nav').style.display = '';
+  document.getElementById('nav-login').style.display = 'none';
+  document.getElementById('nav-home').style.display = '';
+  ['facilities','employees','schedules','availability','timeoff','reports'].forEach(n =>
+    document.getElementById('nav-' + n).style.display = 'none'
+  );
+  if (currentRole === 'manager') {
+    ['facilities','employees','schedules','timeoff','reports'].forEach(n => document.getElementById('nav-' + n).style.display = '');
+    updateTimeOffBadge();
+  } else {
+    ['schedules','availability','timeoff'].forEach(n => document.getElementById('nav-' + n).style.display = '');
+  }
+  showPanel('home');
+}
+
+(async () => {
+  const rt = new URLSearchParams(location.search).get('reset_token');
+  if (rt) {
+    history.replaceState({}, '', location.pathname);
+    document.getElementById('reset-token-input').value = rt;
+    showPanel('reset');
+  } else if (token()) {
+    try { await afterLogin(); } catch { localStorage.removeItem('jwt'); }
+  }
+})();
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    ['forgot-modal','logout-modal','edit-emp-modal','edit-fac-modal','profile-modal'].forEach(id =>
+      document.getElementById(id).style.display = 'none'
+    );
+    closeCpModal();
+  }
+});
+
+// ── Time Off Badge ────────────────────────────────────────────────────────────
+async function updateTimeOffBadge() {
+  if (currentRole !== 'manager') return;
+  try {
+    const all = await apiFetch('/time-off');
+    const n = all.filter(r => r.status === 'pending').length;
+    const b = document.getElementById('timeoff-badge');
+    b.textContent = n; b.style.display = n > 0 ? '' : 'none';
+  } catch {}
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('home-greeting').textContent = timeGreeting() + ', ' + currentUserName.split(' ')[0] + '!';
+  document.getElementById('home-role-label').textContent = currentRole === 'manager' ? 'Manager Dashboard' : 'Employee Dashboard';
+  ['dash-shifts','dash-week-shifts','dash-week-hours','dash-timeoff','dash-employees'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '…';
+  });
+
+  const [statsRes, shiftsRes] = await Promise.allSettled([
+    apiFetch('/dashboard/stats'),
+    currentRole === 'manager' ? apiFetch('/schedules') : apiFetch('/employees/' + currentUserId + '/schedule'),
+  ]);
+
+  if (statsRes.status === 'fulfilled') {
+    const s = statsRes.value;
+    document.getElementById('dash-shifts').textContent = s.upcoming_shifts;
+    document.getElementById('dash-week-shifts').textContent = s.this_week_shifts;
+    document.getElementById('dash-week-hours').textContent = s.this_week_hours + ' h';
+    document.getElementById('dash-timeoff').textContent = s.pending_time_off;
+    if (currentRole === 'manager') {
+      document.getElementById('dash-employees-card').style.display = '';
+      document.getElementById('dash-employees').textContent = s.active_employees ?? '—';
+    } else {
+      document.getElementById('dash-employees-card').style.display = 'none';
+    }
+  } else {
+    ['dash-shifts','dash-week-shifts','dash-week-hours','dash-timeoff'].forEach(id => document.getElementById(id).textContent = '—');
+  }
+
+  const now = new Date();
+  if (shiftsRes.status === 'fulfilled') {
+    const upcoming = shiftsRes.value
+      .filter(s => s.status === 'scheduled' && new Date(s.start_time) >= now)
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    const card = document.getElementById('dash-upcoming-card');
+    const list = document.getElementById('dash-upcoming-list');
+    card.style.display = '';
+    if (currentRole === 'manager') await ensureEmployeeMap();
+    list.innerHTML = upcoming.length === 0
+      ? '<div class="empty-state"><div class="empty-icon">📅</div><p>No upcoming shifts scheduled.</p></div>'
+      : upcoming.slice(0, 5).map(s => {
+          const dt = new Date(s.start_time);
+          const label = currentRole === 'manager' ? (employeeMap[s.user_id] || 'Employee') : (facilityMap[s.facility_id] || 'Facility');
+          return `<div class="shift-item">
+            <div class="shift-date-box">
+              <div class="sday">${dt.toLocaleDateString('en-US',{weekday:'short'})}</div>
+              <div class="snum">${dt.getDate()}</div>
+            </div>
+            <div class="shift-info">
+              <div class="sname">${escapeHtml(label)}</div>
+              <div class="stime">${fmtDateTime(s.start_time)} – ${fmtTime(s.end_time)}</div>
+            </div>
+            <span class="badge badge-green">Scheduled</span>
+          </div>`;
+        }).join('');
+  }
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+async function loadReports() {
+  const tb = document.getElementById('reports-list');
+  tb.innerHTML = loadingRow(4);
+  const wk = document.getElementById('report-week').value;
+  let url = '/reports/hours';
+  if (wk) { const [y, w] = wk.split('-W'); url += '?week=' + y + '-W' + w; }
+  try {
+    const list = await apiFetch(url);
+    tb.innerHTML = list.length
+      ? list.map(r => `<tr>
+          <td>${escapeHtml(r.employee_name)}</td>
+          <td>${r.scheduled_hours}</td>
+          <td>${r.completed_hours}</td>
+          <td>${r.total_shifts}</td>
+        </tr>`).join('')
+      : emptyRow(4, 'No employee shifts found for this period.', '📊');
+  } catch(err) { showMsg(err.message, 'error'); tb.innerHTML = emptyRow(4, 'Failed to load.', '⚠️'); }
+}
+
+// ── Facilities ────────────────────────────────────────────────────────────────
+async function loadFacilities() {
+  const tb = document.getElementById('facilities-list');
+  tb.innerHTML = loadingRow(3);
+  document.getElementById('manager-add-facility').style.display = currentRole === 'manager' ? '' : 'none';
+  try {
+    const list = await apiFetch('/facilities');
+    facilityMap = {}; facilityRegistry = {};
+    list.forEach(f => { facilityMap[f.id] = f.name; facilityRegistry[f.id] = f; });
+    tb.innerHTML = list.length
+      ? list.map(f => `<tr>
+          <td>${escapeHtml(f.name)}</td>
+          <td>${f.opening_time.slice(0,5)}</td>
+          <td>${f.closing_time.slice(0,5)}</td>
+          <td style="display:flex;gap:0.4rem;flex-wrap:wrap">
+            ${currentRole === 'manager'
+              ? `<button class="btn btn-secondary" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="openEditFacilityModal(${f.id})">Edit</button>
+                 <button class="btn btn-danger" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="deleteFacility(${f.id})">Delete</button>`
+              : ''}
+          </td>
+        </tr>`).join('')
+      : emptyRow(4, 'No facilities yet.', '🏢');
+  } catch(err) { showMsg(err.message,'error'); tb.innerHTML = emptyRow(4,'Failed to load.','⚠️'); }
+}
+async function createFacility(e) {
+  e.preventDefault();
+  const open = document.getElementById('fac-open').value, close = document.getElementById('fac-close').value;
+  if (close <= open) { showMsg('Closing time must be after opening time.', 'error'); return; }
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/facilities', { method:'POST', body: JSON.stringify({ name: document.getElementById('fac-name').value, opening_time: open, closing_time: close }) });
+    showMsg('Facility created!', 'success'); e.target.reset(); loadFacilities();
+  } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
+}
+
+function openEditFacilityModal(id) {
+  const f = facilityRegistry[id];
+  if (!f) return;
+  document.getElementById('edit-fac-id').value = id;
+  document.getElementById('edit-fac-name').value = f.name;
+  document.getElementById('edit-fac-open').value = f.opening_time.slice(0, 5);
+  document.getElementById('edit-fac-close').value = f.closing_time.slice(0, 5);
+  document.getElementById('edit-fac-modal').style.display = 'flex';
+}
+function closeEditFacilityModal() {
+  document.getElementById('edit-fac-modal').style.display = 'none';
+}
+async function doEditFacility(e) {
+  e.preventDefault();
+  const open = document.getElementById('edit-fac-open').value;
+  const close = document.getElementById('edit-fac-close').value;
+  if (close <= open) { showMsg('Closing time must be after opening time.', 'error'); return; }
+  const id = parseInt(document.getElementById('edit-fac-id').value);
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/facilities/' + id, { method: 'PUT', body: JSON.stringify({
+      name: document.getElementById('edit-fac-name').value,
+      opening_time: open, closing_time: close
+    })});
+    closeEditFacilityModal();
+    showMsg('Facility updated.', 'success');
+    loadFacilities();
+  } catch(err) { showMsg(err.message, 'error'); } finally { setLoading(btn, false); }
+}
+async function deleteFacility(id) {
+  if (!confirm('Delete this facility? This cannot be undone.')) return;
+  try {
+    await apiFetch('/facilities/' + id, { method: 'DELETE' });
+    showMsg('Facility deleted.', 'success');
+    loadFacilities();
+  } catch(err) { showMsg(err.message, 'error'); }
+}
+
+async function openProfileModal(id) {
+  const u = userRegistry[id];
+  if (!u) return;
+  const initials = u.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+  const av = document.getElementById('profile-avatar');
+  av.textContent = initials; av.style.background = u.role === 'manager' ? '#e94560' : '#667eea';
+  document.getElementById('profile-name').textContent = u.name;
+  document.getElementById('profile-email').textContent = u.email;
+  document.getElementById('profile-meta').textContent =
+    u.role.charAt(0).toUpperCase() + u.role.slice(1) +
+    (u.employee_role ? ' · ' + u.employee_role.charAt(0).toUpperCase() + u.employee_role.slice(1) : '') +
+    ' · Hired ' + fmtDate(u.hired_at.slice(0,10));
+  document.getElementById('profile-modal').style.display = 'flex';
+
+  const shiftsTb = document.getElementById('profile-shifts');
+  const availTb = document.getElementById('profile-availability');
+  const timeoffTb = document.getElementById('profile-timeoff');
+  shiftsTb.innerHTML = loadingRow(4);
+  availTb.innerHTML = loadingRow(3);
+  timeoffTb.innerHTML = loadingRow(4);
+
+  await ensureFacilityMap();
+
+  const [shiftsRes, availRes, timeoffRes] = await Promise.allSettled([
+    apiFetch('/employees/' + id + '/schedule'),
+    apiFetch('/employees/' + id + '/availability'),
+    apiFetch('/time-off/employee/' + id),
+  ]);
+
+  if (shiftsRes.status === 'fulfilled') {
+    const now = new Date();
+    const upcoming = shiftsRes.value
+      .filter(s => s.status === 'scheduled' && new Date(s.start_time) >= now)
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    shiftsTb.innerHTML = upcoming.length
+      ? upcoming.map(s => `<tr>
+          <td>${fmtDate(s.start_time.slice(0,10))}</td>
+          <td>${escapeHtml(facilityMap[s.facility_id] || String(s.facility_id))}</td>
+          <td>${fmtTime(s.start_time)} – ${fmtTime(s.end_time)}</td>
+          <td><span class="badge badge-green">Scheduled</span></td>
+        </tr>`).join('')
+      : emptyRow(4, 'No upcoming shifts.', '📅');
+  } else { shiftsTb.innerHTML = emptyRow(4, 'Failed to load.', '⚠️'); }
+
+  if (availRes.status === 'fulfilled') {
+    availTb.innerHTML = availRes.value.length
+      ? availRes.value.map(a => `<tr><td>${DAYS[a.day_of_week]}</td><td>${a.start_time.slice(0,5)}</td><td>${a.end_time.slice(0,5)}</td></tr>`).join('')
+      : emptyRow(3, 'No availability set.', '🗓️');
+  } else { availTb.innerHTML = emptyRow(3, 'Failed to load.', '⚠️'); }
+
+  if (timeoffRes.status === 'fulfilled') {
+    timeoffTb.innerHTML = timeoffRes.value.length
+      ? timeoffRes.value.map(r => `<tr>
+          <td>${fmtDate(r.start_date)}</td><td>${fmtDate(r.end_date)}</td>
+          <td>${escapeHtml(r.reason)}</td><td>${sBadge(r.status)}</td>
+        </tr>`).join('')
+      : emptyRow(4, 'No time off requests.', '🌴');
+  } else { timeoffTb.innerHTML = emptyRow(4, 'Failed to load.', '⚠️'); }
+}
+function closeProfileModal() {
+  document.getElementById('profile-modal').style.display = 'none';
+}
+
+// ── Employees ─────────────────────────────────────────────────────────────────
+async function loadEmployees() {
+  document.getElementById('manager-add-employee').style.display = currentRole === 'manager' ? '' : 'none';
+  if (currentRole !== 'manager') return;
+
+  const empTb = document.getElementById('employees-list');
+  const mgrTb = document.getElementById('managers-list');
+  empTb.innerHTML = loadingRow(5);
+  mgrTb.innerHTML = loadingRow(4);
+  document.getElementById('emp-search').value = '';
+
+  try {
+    const [employees, managers, inactive] = await Promise.all([
+      apiFetch('/employees'), apiFetch('/employees/managers'), apiFetch('/employees/inactive')
+    ]);
+
+    employeeMap = {}; employeeEmailMap = {}; userRegistry = {};
+    [...employees, ...managers, ...inactive].forEach(u => {
+      employeeMap[u.id] = u.name; employeeEmailMap[u.id] = u.email; userRegistry[u.id] = u;
+    });
+
+    mgrTb.innerHTML = managers.length
+      ? managers.map(u => `<tr>
+          <td><a class="clickable-name" onclick="openProfileModal(${u.id})">${escapeHtml(u.name)}</a></td>
+          <td style="color:#718096;font-size:0.82rem">${escapeHtml(u.email)}</td>
+          <td style="color:#718096">${fmtDate(u.hired_at.slice(0,10))}</td>
+          <td style="display:flex;gap:0.4rem;flex-wrap:wrap">
+            ${u.id === currentUserId
+              ? '<span style="color:#a0aec0;font-size:0.78rem">You</span>'
+              : `<button class="btn btn-secondary" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="openEditModal(${u.id})">Edit</button>
+                 <button class="btn btn-danger" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="deleteEmployee(${u.id})">Deactivate</button>`}
+          </td>
+        </tr>`).join('')
+      : emptyRow(4, 'No other managers.', '👤');
+
+    activeEmployees = employees;
+    renderEmployeeRows(employees);
+
+    const deactCard = document.getElementById('deactivated-card');
+    const deactTb = document.getElementById('deactivated-list');
+    if (inactive.length) {
+      deactCard.style.display = '';
+      deactTb.innerHTML = inactive.map(u => `<tr>
+          <td>${escapeHtml(u.name)}</td>
+          <td style="color:#718096;font-size:0.82rem">${escapeHtml(u.email)}</td>
+          <td><span class="badge badge-gray">${escapeHtml(u.role)}</span></td>
+          <td><button class="btn" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="reactivateEmployee(${u.id})">Reactivate</button></td>
+        </tr>`).join('');
+    } else {
+      deactCard.style.display = 'none';
+    }
+  } catch(err) { showMsg(err.message,'error'); empTb.innerHTML = emptyRow(5,'Failed to load.','⚠️'); }
+}
+
+function renderEmployeeRows(list) {
+  const empTb = document.getElementById('employees-list');
+  empTb.innerHTML = list.length
+    ? list.map(u => `<tr>
+        <td><a class="clickable-name" onclick="openProfileModal(${u.id})">${escapeHtml(u.name)}</a></td>
+        <td style="color:#718096;font-size:0.82rem">${escapeHtml(u.email)}</td>
+        <td>${u.employee_role ? `<span class="badge badge-gray">${escapeHtml(u.employee_role)}</span>` : '—'}</td>
+        <td style="color:#718096">${fmtDate(u.hired_at.slice(0,10))}</td>
+        <td style="display:flex;gap:0.4rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="openEditModal(${u.id})">Edit</button>
+          <button class="btn btn-danger" style="padding:0.3rem 0.65rem;font-size:0.78rem" onclick="deleteEmployee(${u.id})">Deactivate</button>
+        </td>
+      </tr>`).join('')
+    : emptyRow(5, 'No employees found.', '👥');
+}
+function filterEmployees(q) {
+  const term = q.trim().toLowerCase();
+  renderEmployeeRows(term ? activeEmployees.filter(u => u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)) : activeEmployees);
+}
+async function createEmployee(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  const role = document.getElementById('emp-role').value;
+  try {
+    await apiFetch('/employees', { method:'POST', body: JSON.stringify({
+      name: document.getElementById('emp-name').value,
+      email: document.getElementById('emp-email').value,
+      password: document.getElementById('emp-password').value,
+      role,
+      employee_role: role === 'employee' ? (document.getElementById('emp-level').value || null) : null
+    })});
+    showMsg(role === 'manager' ? 'Manager added!' : 'Employee added!', 'success');
+    e.target.reset();
+    document.getElementById('emp-role').value = 'employee';
+    document.getElementById('emp-level-wrap').style.display = '';
+    checkStrength('','emp-pw-bar','emp-pw-label');
+    loadEmployees();
+  } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
+}
+async function deleteEmployee(id) {
+  if (!confirm('Deactivate this employee?')) return;
+  try { await apiFetch('/employees/' + id, { method:'DELETE' }); showMsg('Employee deactivated.','success'); loadEmployees(); }
+  catch(err) { showMsg(err.message,'error'); }
+}
+
+// ── Schedule ──────────────────────────────────────────────────────────────────
+async function loadScheduleDropdowns() {
+  if (currentRole !== 'manager') return;
+  try {
+    const [facs, emps] = await Promise.all([apiFetch('/facilities'), apiFetch('/employees')]);
+    facilityMap = {}; facs.forEach(f => { facilityMap[f.id] = f.name; });
+    employeeMap = {}; employeeEmailMap = {};
+    emps.forEach(u => { employeeMap[u.id] = u.name; employeeEmailMap[u.id] = u.email; });
+    document.getElementById('shift-facility').innerHTML = facs.map(f => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join('');
+    document.getElementById('shift-employee').innerHTML = emps.map(u => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join('');
+  } catch {}
+}
+async function loadSchedule() {
+  const wk = document.getElementById('schedule-week').value;
+  let url = '/schedules';
+  if (wk) { const [y,w] = wk.split('-W'); url += '?week=' + y + '-W' + w; }
+  document.getElementById('manager-add-shift').style.display = currentRole === 'manager' ? '' : 'none';
+  const tb = document.getElementById('schedules-list');
+  tb.innerHTML = loadingRow(6);
+  if (currentRole === 'manager') await ensureEmployeeMap();
+  try {
+    let list;
+    if (currentRole === 'manager') { list = await apiFetch(url); }
+    else {
+      let eu = '/employees/' + currentUserId + '/schedule';
+      if (wk) { const [y,w] = wk.split('-W'); eu += '?week=' + y + '-W' + w; }
+      list = await apiFetch(eu);
+    }
+    const sBadge = s => s === 'scheduled' ? '<span class="badge badge-green">Scheduled</span>'
+      : s === 'completed' ? '<span class="badge badge-gray">Completed</span>'
+      : '<span class="badge badge-red">Cancelled</span>';
+    tb.innerHTML = list.length
+      ? list.map(s => `<tr>
+          <td>${currentRole === 'manager' ? empLabel(s.user_id) : escapeHtml(currentUserName)}</td>
+          <td>${escapeHtml(facilityMap[s.facility_id] || String(s.facility_id))}</td>
+          <td>${fmtDateTime(s.start_time)}</td>
+          <td>${fmtDateTime(s.end_time)}</td>
+          <td>${sBadge(s.status)}</td>
+          <td>${currentRole === 'manager' && s.status === 'scheduled' ? (new Date(s.end_time) <= new Date() ? `<button class="btn btn-success" onclick="completeShift(${s.id})">Complete</button> <button class="btn btn-danger" onclick="cancelShift(${s.id})">Cancel</button>` : `<button class="btn btn-danger" onclick="cancelShift(${s.id})">Cancel</button>`) : ''}</td>
+        </tr>`).join('')
+      : emptyRow(6, 'No shifts found for this period.', '📆');
+  } catch(err) { showMsg(err.message,'error'); tb.innerHTML = emptyRow(6,'Failed to load.','⚠️'); }
+}
+async function createShift(e) {
+  e.preventDefault();
+  const start = document.getElementById('shift-start').value, end = document.getElementById('shift-end').value;
+  if (end <= start) { showMsg('End time must be after start time.', 'error'); return; }
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/schedules', { method:'POST', body: JSON.stringify({ facility_id: parseInt(document.getElementById('shift-facility').value), user_id: parseInt(document.getElementById('shift-employee').value), start_time: start + ':00', end_time: end + ':00' }) });
+    showMsg('Shift assigned!', 'success');
+    document.getElementById('shift-start').value = ''; document.getElementById('shift-end').value = '';
+    loadSchedule();
+  } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
+}
+async function cancelShift(id) {
+  if (!confirm('Cancel this shift?')) return;
+  try { await apiFetch('/schedules/' + id, { method:'DELETE' }); showMsg('Shift cancelled.','success'); loadSchedule(); }
+  catch(err) { showMsg(err.message,'error'); }
+}
+async function completeShift(id) {
+  try { await apiFetch('/schedules/' + id + '/complete', { method:'PUT' }); showMsg('Shift marked as completed.','success'); loadSchedule(); }
+  catch(err) { showMsg(err.message,'error'); }
+}
+
+// ── Availability ──────────────────────────────────────────────────────────────
+async function loadAvailability() {
+  const tb = document.getElementById('availability-list');
+  tb.innerHTML = loadingRow(4);
+  try {
+    const list = await apiFetch('/availability/me');
+    tb.innerHTML = list.length
+      ? list.map(a => `<tr><td>${DAYS[a.day_of_week]}</td><td>${a.start_time}</td><td>${a.end_time}</td><td><button class="btn btn-danger" onclick="deleteAvailability(${a.id})">Remove</button></td></tr>`).join('')
+      : emptyRow(4, 'No availability set yet.', '🗓️');
+  } catch(err) { showMsg(err.message,'error'); tb.innerHTML = emptyRow(4,'Failed to load.','⚠️'); }
+}
+async function addAvailability(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/availability', { method:'POST', body: JSON.stringify({ day_of_week: parseInt(document.getElementById('avail-day').value), start_time: document.getElementById('avail-start').value, end_time: document.getElementById('avail-end').value }) });
+    showMsg('Availability added!','success');
+    document.getElementById('avail-start').value = ''; document.getElementById('avail-end').value = '';
+    loadAvailability();
+  } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
+}
+async function deleteAvailability(id) {
+  try { await apiFetch('/availability/' + id, { method:'DELETE' }); showMsg('Removed.','success'); loadAvailability(); }
+  catch(err) { showMsg(err.message,'error'); }
+}
+
+// ── Time Off ──────────────────────────────────────────────────────────────────
+const sBadge = s => s === 'pending' ? '<span class="badge badge-yellow">Pending</span>'
+  : s === 'approved' ? '<span class="badge badge-green">Approved</span>'
+  : '<span class="badge badge-red">Denied</span>';
+
+let _timeOffSkip = 0;
+const _TIME_OFF_LIMIT = 20;
+function _timeOffRow(r) { return `<tr><td>${fmtDate(r.start_date)}</td><td>${fmtDate(r.end_date)}</td><td>${escapeHtml(r.reason)}</td><td>${sBadge(r.status)}</td></tr>`; }
+async function loadTimeOff() {
+  _timeOffSkip = 0;
+  const myTb = document.getElementById('my-timeoff-list');
+  myTb.innerHTML = loadingRow(4);
+  try {
+    const mine = await apiFetch(`/time-off/me?skip=0&limit=${_TIME_OFF_LIMIT}`);
+    myTb.innerHTML = mine.length ? mine.map(_timeOffRow).join('') : emptyRow(4, 'No time off requests yet.', '🌴');
+    _timeOffSkip = mine.length;
+    document.getElementById('timeoff-load-more').style.display = mine.length === _TIME_OFF_LIMIT ? '' : 'none';
+  } catch(err) { showMsg(err.message,'error'); myTb.innerHTML = emptyRow(4,'Failed to load.','⚠️'); }
+
+  if (currentRole === 'manager') {
+    document.getElementById('manager-timeoff-card').style.display = '';
+    const allTb = document.getElementById('all-timeoff-list');
+    allTb.innerHTML = loadingRow(6);
+    await ensureEmployeeMap();
+    try {
+      const all = await apiFetch('/time-off');
+      allTb.innerHTML = all.length
+        ? all.map(r => `<tr>
+            <td>${empLabel(r.user_id)}</td><td>${fmtDate(r.start_date)}</td><td>${fmtDate(r.end_date)}</td>
+            <td>${escapeHtml(r.reason)}</td><td>${sBadge(r.status)}</td>
+            <td style="display:flex;gap:0.5rem">${r.status === 'pending'
+              ? `<button class="btn" onclick="reviewTimeOff(${r.id},'approve')">Approve</button><button class="btn btn-danger" onclick="reviewTimeOff(${r.id},'deny')">Deny</button>`
+              : '—'}</td>
+          </tr>`).join('')
+        : emptyRow(6, 'No time off requests.', '✅');
+      updateTimeOffBadge();
+    } catch(err) { showMsg(err.message,'error'); allTb.innerHTML = emptyRow(6,'Failed to load.','⚠️'); }
+  }
+}
+async function loadMoreTimeOff() {
+  try {
+    const more = await apiFetch(`/time-off/me?skip=${_timeOffSkip}&limit=${_TIME_OFF_LIMIT}`);
+    if (more.length) {
+      document.getElementById('my-timeoff-list').insertAdjacentHTML('beforeend', more.map(_timeOffRow).join(''));
+      _timeOffSkip += more.length;
+    }
+    document.getElementById('timeoff-load-more').style.display = more.length === _TIME_OFF_LIMIT ? '' : 'none';
+  } catch(err) { showMsg(err.message,'error'); }
+}
+async function submitTimeOff(e) {
+  e.preventDefault();
+  const start = document.getElementById('to-start').value, end = document.getElementById('to-end').value;
+  if (end < start) { showMsg('End date must be on or after start date.', 'error'); return; }
+  const btn = e.target.querySelector('button[type="submit"]'); setLoading(btn, true);
+  try {
+    await apiFetch('/time-off', { method:'POST', body: JSON.stringify({ start_date: start, end_date: end, reason: document.getElementById('to-reason').value }) });
+    showMsg('Request submitted!','success'); e.target.reset();
+    document.getElementById('to-reason-count').textContent = '0 / 300';
+    loadTimeOff();
+  } catch(err) { showMsg(err.message,'error'); } finally { setLoading(btn, false); }
+}
+async function reviewTimeOff(id, action) {
+  try {
+    await apiFetch('/time-off/' + id + '/' + action, { method:'PUT' });
+    showMsg('Request ' + action + 'd.', 'success');
+    loadTimeOff(); updateTimeOffBadge();
+  } catch(err) { showMsg(err.message,'error'); }
+}
+</script>
+</body>
+</html>
